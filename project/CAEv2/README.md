@@ -1,7 +1,7 @@
 # CAE v2: Context Autoencoder with CLIP Latent Alignment 
 
 <p align="center">
-  <img src='CAEv2.png' width = "80%">
+  <img src='CAEv2.jpg' width = "80%">
 </p>
 
 This is the *official* repository with PyTorch implementation of [CAE v2: Context Autoencoder with CLIP Latent Alignment](https://openreview.net/forum?id=f36LaK7M0F).
