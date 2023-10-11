@@ -8,8 +8,11 @@ This is a PyTorch implementation of [CAE: Context AutoEncoder for Self-Supervise
 
 ## Highlights
 
-- 2023/10/11: Release a serious of pre-trained models in CAE v2. Please refer to ```project/CAEv2/```
 - State-of-the-art MIM performance. Results in the paper are successfully reproduced.
+
+## News
+
+- **`2023/10/11`**: We release [CAE v2](https://github.com/Atten4Vis/CAE/tree/master/project/CAEv2), a context autoencoder with CLIP latent alignment. **A serious of pre-trained models** in CAE v2 are available. Please refer to ```project/CAEv2/```
 
 ## Installation
 
