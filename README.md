@@ -8,6 +8,7 @@ This is a PyTorch implementation of [CAE: Context AutoEncoder for Self-Supervise
 
 ## Highlights
 
+- 2023/10/11: Release a serious of pre-trained models in CAE v2. Please refer to ```project/CAEv2/```
 - State-of-the-art MIM performance. Results in the paper are successfully reproduced.
 
 ## Installation
