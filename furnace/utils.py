@@ -30,6 +30,8 @@ from tensorboardX import SummaryWriter
 import torch.nn.functional as F
 from torch.nn.modules.batchnorm import _NormBase
 
+## for CAE v2
+import clip.modeling_clip as CLIP
 
 
 
@@ -598,6 +600,8 @@ def create_d_vae(weight_path, d_vae_type, image_size, device, args=None):
         return get_d_vae(weight_path, image_size, device, args)
     elif d_vae_type == "to_tensor":
         return None
+    elif d_vae_type == "clip":
+        return get_clip(weight_path, image_size, device, args)
     else:
         raise NotImplementedError()
 
@@ -633,6 +637,10 @@ def get_d_vae(weight_path, image_size, device, args):
     model.load_state_dict(state_dict)
     return model
 
+def get_clip(weight_path, image_size, device, args):
+    weight_path = os.path.join(weight_path, 'ViT-B-16.pt')
+    model, _ = CLIP.load(weight_path, device, image_resolution=image_size)
+    return model
 
 def create_ds_config(args):
     args.deepspeed_config = os.path.join(args.output_dir, "deepspeed_config.json")

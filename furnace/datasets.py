@@ -51,6 +51,11 @@ class DataAugmentationForCAE(object):
                 transforms.ToTensor(),
                 map_pixels,
             ])
+        elif args.discrete_vae_type == 'clip':
+            self.visual_token_transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+            ])
         elif args.discrete_vae_type == "customized":
             self.visual_token_transform = transforms.Compose([
                 transforms.ToTensor(),

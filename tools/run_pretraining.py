@@ -19,11 +19,13 @@ import furnace.utils as utils
 
 def get_args():
     parser = argparse.ArgumentParser('pre-training script', add_help=False)
+
+    parser.add_argument('--model_type', default='cae', help='select model type', choices=['cae', 'caev2'])
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--epochs', default=300, type=int)
     parser.add_argument('--save_ckpt_freq', default=50, type=int)
     parser.add_argument("--discrete_vae_weight_path", type=str)
-    parser.add_argument("--discrete_vae_type", type=str, default="dall-e", help='[dall-e, vqgan_gumbel_f8_8192, customized]')
+    parser.add_argument("--discrete_vae_type", type=str, default="dall-e", help='[dall-e, vqgan_gumbel_f8_8192, clip, customized]')
     parser.add_argument('--dvae_num_layers', default=3, type=int)
 
     # Model parameters
@@ -146,9 +148,12 @@ def get_args():
                         help='Number of classes for decoder')  # it should be the same as vocab size
     parser.add_argument('--decoder_layer_scale_init_value', default=0.1, type=float,
                         help='decoder layer scale init value')
+    parser.add_argument('--num_out_dim', default=512, type=int,
+                    help='dimensionaltiy of output head for decoder, this should be the same as the output of CLIP, i.e., clip-base=512, clip-large=768')
 
     # alignment constraint
     parser.add_argument('--align_loss_weight', type=float, default=2, help='loss weight for the alignment constraint')
+    parser.add_argument('--latent_alignment_loss_weight', type=float, default=0, help='loss weight for visible and masked latent alignment in CAE v2')
     
     # init func, borrowed from BEiT
     parser.add_argument('--fix_init_weight', action='store_true', default=False, help='if true, the fix_init_weight() func will be activated')

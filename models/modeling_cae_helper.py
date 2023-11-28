@@ -311,8 +311,9 @@ from unmasked representation using cross attention
 class LatentRegresser(nn.Module):
     def __init__(self, embed_dim=768, regresser_depth=6, num_heads=12, 
                 mlp_ratio=4., qkv_bias=True, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
-                 drop_path_rate=0., norm_layer=None, init_values=None, init_std=0.02):
+                 drop_path_rate=0., norm_layer=None, init_values=None, init_std=0.02, model_type='cae'):
         super().__init__()
+        self.model_type = model_type
 
         self.num_features = self.embed_dim = embed_dim
 
@@ -363,7 +364,9 @@ class LatentRegresser(nn.Module):
         # latent contextual regressor: regress masked latent from unmask latent 
         for blk in self.regressor_blocks:
             x_masked = blk(x_masked, torch.cat([x_unmasked, x_masked], dim=1), pos_embed_masked, torch.cat([pos_embed_unmasked, pos_embed_masked], dim=1))
-        x_masked = self.norm(x_masked)
+
+        if self.model_type != 'caev2':
+            x_masked = self.norm(x_masked)
 
         return x_masked
 
@@ -379,13 +382,16 @@ class Decoder(nn.Module):
 
         self.num_features = self.embed_dim = embed_dim
 
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, decoder_depth)]
-        self.decoder_blocks = nn.ModuleList([
-            Block(
-                dim=embed_dim, num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale,
-                drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer,
-                init_values=init_values)
-            for i in range(decoder_depth)])
+        if decoder_depth > 0:
+            dpr = [x.item() for x in torch.linspace(0, drop_path_rate, decoder_depth)]
+            self.decoder_blocks = nn.ModuleList([
+                Block(
+                    dim=embed_dim, num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale,
+                    drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer,
+                    init_values=init_values)
+                for i in range(decoder_depth)])
+        else:
+            self.decoder_blocks = None
 
         self.norm = norm_layer(embed_dim)
         self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
@@ -401,9 +407,10 @@ class Decoder(nn.Module):
         def rescale(param, layer_id):
             param.div_(math.sqrt(2.0 * layer_id))
 
-        for layer_id, layer in enumerate(self.decoder_blocks):
-            rescale(layer.attn.proj.weight.data, layer_id + 1)
-            rescale(layer.mlp.fc2.weight.data, layer_id + 1)
+        if self.decoder_blocks is not None:
+            for layer_id, layer in enumerate(self.decoder_blocks):
+                rescale(layer.attn.proj.weight.data, layer_id + 1)
+                rescale(layer.mlp.fc2.weight.data, layer_id + 1)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -422,13 +429,22 @@ class Decoder(nn.Module):
     def no_weight_decay(self):
         return {'pos_embed', 'cls_token'}
 
-    def forward(self, x_masked, pos_embed_masked):
-        # latent contextual regressor
-        x_masked = x_masked + pos_embed_masked  # add pos embed, like encoder
-        for blk in self.decoder_blocks:
-            x_masked = blk(x_masked)
-        x_masked = self.norm(x_masked)
+    def forward(self, x_masked, pos_embed_masked, x_cls_token=None, x_unmasked=None):
+        if self.decoder_blocks is None:
+            x_masked = self.norm(x_masked)
+            latent_pred = x_masked
+            x_unmasked = self.norm(x_unmasked)
+            x_cls_token = self.norm(x_cls_token)
+            x = torch.cat([x_cls_token, x_unmasked, x_masked], dim=1)
+            logits = self.head(x)
+            return logits, latent_pred
+        else:
+            # latent contextual regressor
+            x_masked = x_masked + pos_embed_masked  # add pos embed, like encoder
+            for blk in self.decoder_blocks:
+                x_masked = blk(x_masked)
+            x_masked = self.norm(x_masked)
 
-        logits = self.head(x_masked)
+            logits = self.head(x_masked)
 
-        return logits
+            return logits

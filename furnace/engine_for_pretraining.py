@@ -37,10 +37,20 @@ def train_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
         samples = samples.to(device, non_blocking=True)
         bool_masked_pos = bool_masked_pos.to(device, non_blocking=True)
 
-        with torch.no_grad():
-            input_ids = d_vae.get_codebook_indices(images).flatten(1)
-            bool_masked_pos = bool_masked_pos.flatten(1).to(torch.bool)
-            labels = input_ids[bool_masked_pos]
+        with torch.no_grad(): 
+            if args.model_type == 'caev2' and args.discrete_vae_type == 'clip':
+                bool_masked_pos = bool_masked_pos.flatten(1).to(torch.bool)
+                input_ids = d_vae.extract_image_features(images)
+                C = input_ids.shape[-1]
+                cls_token_labels = input_ids[:, :1, :]
+                input_ids = input_ids[:, 1:, :]
+                masked_labels = input_ids[bool_masked_pos].reshape(images.shape[0], -1, C)
+                unmasked_labels = input_ids[~bool_masked_pos].reshape(images.shape[0], -1, C)
+                labels = torch.cat([cls_token_labels, unmasked_labels, masked_labels], dim=1)
+            else:
+                input_ids = d_vae.get_codebook_indices(images).flatten(1)
+                bool_masked_pos = bool_masked_pos.flatten(1).to(torch.bool)
+                labels = input_ids[bool_masked_pos]
 
         with torch.cuda.amp.autocast():
             outputs = model(samples, bool_masked_pos=bool_masked_pos)
@@ -49,8 +59,15 @@ def train_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
             else:
                 raise NotImplementedError(str(len(outputs)))
 
-            loss_main = nn.CrossEntropyLoss()(input=outputs.float(), target=labels)
-            loss_align = args.align_loss_weight * F.mse_loss(latent_predict.float(), latent_target.detach().float(), reduction="mean")
+            if args.model_type == 'caev2':
+                labels = labels / labels.norm(dim=-1, keepdim=True) # l2 norm for caev2
+                C = outputs.shape[-1]
+                # calculate visible_latent_alignment and masked_latent_alignment losses
+                loss_main = args.latent_alignment_loss_weight * F.cosine_embedding_loss(outputs.reshape(-1, C).float(), labels.reshape(-1, C), torch.ones_like(labels.reshape(-1, C)[:, 0]), reduction="mean")
+                loss_align = torch.zeros(1)[0].cuda()
+            else:
+                loss_main = nn.CrossEntropyLoss()(input=outputs.float(), target=labels)
+                loss_align = args.align_loss_weight * F.mse_loss(latent_predict.float(), latent_target.detach().float(), reduction="mean")
             
             loss = loss_main + loss_align
 
@@ -71,10 +88,11 @@ def train_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
 
         torch.cuda.synchronize()
 
-        mlm_acc = (outputs.max(-1)[1] == labels).float().mean().item()
-        metric_logger.update(mlm_acc=mlm_acc)
-        if log_writer is not None:
-            log_writer.update(mlm_acc=mlm_acc, head="loss")
+        if args.model_type != 'caev2':
+            mlm_acc = (outputs.max(-1)[1] == labels).float().mean().item()
+            metric_logger.update(mlm_acc=mlm_acc)
+            if log_writer is not None:
+                log_writer.update(mlm_acc=mlm_acc, head="loss")
 
         metric_logger.update(loss=loss_value)
         metric_logger.update(loss_main=loss_main_value)
