@@ -12,6 +12,7 @@ This is a PyTorch implementation of [CAE: Context AutoEncoder for Self-Supervise
 
 ## News
 
+- **`2023/11/28`**: We release the training code of [CAE v2](https://github.com/Atten4Vis/CAE/tree/master/project/CAEv2). Please refer to ```project/CAEv2/README.md```
 - **`2023/10/11`**: We release [CAE v2](https://github.com/Atten4Vis/CAE/tree/master/project/CAEv2), a context autoencoder with CLIP latent alignment. **A serious of pre-trained models** in CAE v2 are available. Please refer to ```project/CAEv2/```
 
 ## Installation
